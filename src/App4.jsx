@@ -1,9 +1,9 @@
 // eslint-disable-next-line no-unused-vars
 
 import {io} from 'socket.io-client'
-import {useRef,useEffect} from "react"
+import {useRef,useEffect,useState} from "react"
 import { FiVideo,FiVideoOff,FiMic,FiMicOff} from 'react-icons/fi'
-import './style.css'
+
 const configuration = {
     iceServers: [
       {
@@ -22,7 +22,6 @@ const configuration = {
   let startButton; 
   let hangupButton; 
   let muteAudButton; 
-  let muteVidButton;
   let remoteVideo;
   let localVideo;
   socket.on('message', e => {
@@ -57,8 +56,10 @@ const configuration = {
         console.log('unhandled', e);
         break;
     }})
-    function createPeerConnection() {
-        try{
+    
+    async function makeCall(){
+    try{
+     
       pc = new RTCPeerConnection(configuration);
       pc.onicecandidate = e => {
         const message = {
@@ -73,17 +74,7 @@ const configuration = {
         socket.emit('message',message);
       };
       pc.ontrack = e => remoteVideo.current.srcObject = e.streams[0];
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    }
-    catch(e){
-        console.log(e)
-    }
-    }
-    
-    async function makeCall() {
-    try{
-      await createPeerConnection();
-    
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream)); 
       const offer = await pc.createOffer();
       socket.emit('message',{type: 'offer', sdp: offer.sdp});
       await pc.setLocalDescription(offer);
@@ -99,7 +90,21 @@ const configuration = {
         return;
       }
       try{
-      await createPeerConnection();
+        pc = new RTCPeerConnection(configuration);
+        pc.onicecandidate = e => {
+          const message = {
+            type: 'candidate',
+            candidate: null,
+          };
+          if (e.candidate) {
+            message.candidate = e.candidate.candidate;
+            message.sdpMid = e.candidate.sdpMid;
+            message.sdpMLineIndex = e.candidate.sdpMLineIndex;
+          }
+          socket.emit('message',message);
+        };
+        pc.ontrack = e => remoteVideo.current.srcObject = e.streams[0];
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
       await pc.setRemoteDescription(offer);
     
       const answer = await pc.createAnswer();
@@ -150,7 +155,7 @@ const configuration = {
         startButton.current.disabled = false;
         hangupButton.current.disabled = true;
         muteAudButton.current.disabled = true;
-        muteVidButton.current.disabled = true;
+     
       }
       
       
@@ -159,15 +164,13 @@ function App() {
     startButton =useRef(null)
     hangupButton =useRef(null)
     muteAudButton =useRef(null)
-    muteVidButton =useRef(null)
     localVideo =useRef(null) 
     remoteVideo = useRef(null)
     useEffect(()=>{
         hangupButton.current.disabled=true
         muteAudButton.current.disabled=true
-        muteVidButton.current.disabled=true
     },[])
-    
+    const[audiostate,setAudio]=useState(false)
     
     
     
@@ -185,7 +188,6 @@ function App() {
       startButton.current.disabled = true;
       hangupButton.current.disabled = false;
       muteAudButton.current.disabled=false
-      muteVidButton.current.disabled=false
     
       socket.emit('message',{type: 'ready'});
     };
@@ -193,16 +195,22 @@ function App() {
      const hangB =async () => {
       hangup();
       socket.emit('message',{type: 'bye'});
+      
     };
     
 
    
   function muteAudio(){
-   
+   if(audiostate){
+    localVideo.current.muted=true
+    setAudio(false)
+   }
+   else{
+    localVideo.current.muted=false
+    setAudio(true)
+   }
   }
-function muteVideo(){
 
-}
     
   
  
@@ -220,8 +228,8 @@ function muteVideo(){
     <div className='btn'>
     <button className='btn-item btn-start' ref={startButton} onClick={startB} > <FiVideo /></button>
     <button className='btn-item btn-end' ref={hangupButton} onClick={hangB}> <FiVideoOff /></button>
-    <button className='btn-item btn-start' ref={muteAudButton} onClick={muteAudio}> <FiMic /></button>
-     <button className='btn-item btn-end' ref={muteVidButton} onClick={muteVideo}> <FiMicOff /> </button>
+    <button className='btn-item btn-start' ref={muteAudButton} onClick={muteAudio}> { audiostate ?<FiMic />:<FiMicOff />}</button>
+    
     </div>
     </main>
       </>
