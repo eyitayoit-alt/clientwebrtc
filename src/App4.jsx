@@ -15,7 +15,7 @@ const configuration = {
     ],
     iceCandidatePoolSize: 10,
   }
-  const socket=io('http://localhost:3000',{ transports : ['websocket'] })
+  const socket=io('https://rtcp2p.onrender.com/ ',{ transports : ['websocket'] })
   
   let pc;
   let localStream;
